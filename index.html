@@ -1,427 +1,87 @@
-
 <!DOCTYPE html>
-<html lang="en">
-
-<head>
-    <title>three.js - Snow Halation Demo</title>
+<html lang="en-us">
+  <head>
     <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
-    <style>
-        body {
-            font-family: Monospace;
-            background-color: #fff;
-            color: #000;
-            margin: 0px;
-            overflow: hidden;
-        }
-        
-        #info {
-            position: absolute;
-            top: 10px;
-            width: 100%;
-            text-align: center;
-            display: block;
-            color: white;
-        }
-    </style>
-</head>
-
-<body>
-    <div id="info">
-        https://drive.google.com/open?id=1VRWFMfApQeZszZgFMrNAyH20MX5yzTZG<br> Prepared by: Justin P. <br>
-        <p id = "loading"></p>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+    <title>Unity WebGL Player | 2D Character Sampler</title>
+    <link rel="shortcut icon" href="TemplateData/favicon.ico">
+    <link rel="stylesheet" href="TemplateData/style.css">
+  </head>
+  <body>
+    <div id="unity-container" class="unity-desktop">
+      <canvas id="unity-canvas" width=960 height=600></canvas>
+      <div id="unity-loading-bar">
+        <div id="unity-logo"></div>
+        <div id="unity-progress-bar-empty">
+          <div id="unity-progress-bar-full"></div>
+        </div>
+      </div>
+      <div id="unity-mobile-warning">
+        WebGL builds are not supported on mobile devices.
+      </div>
+      <div id="unity-footer">
+        <div id="unity-webgl-logo"></div>
+        <div id="unity-fullscreen-button"></div>
+        <div id="unity-build-title">2D Character Sampler</div>
+      </div>
     </div>
-
-    <script src="three.js"></script>
-    <script src="js/libs/mmdparser.min.js"></script>
-    <script src="js/libs/ammo.js"></script>
-    <script src="js/loaders/TGALoader.js"></script>
-    <script src="js/loaders/MMDLoader.js"></script>
-    <script src="js/effects/OutlineEffect.js"></script>
-    <script src="js/animation/CCDIKSolver.js"></script>
-    <script src="js/animation/MMDPhysics.js"></script>
-    <script src="js/Detector.js"></script>
-    <script src="js/libs/stats.min.js"></script>
-    
     <script>
-        
-        //Basic Initialization Variables
-        var container, stats;
-        var controls, camera, scene, renderer, effect;
+      var buildUrl = "Build";
+      var loaderUrl = buildUrl + "/Web.loader.js";
+      var config = {
+        dataUrl: buildUrl + "/Web.data.br",
+        frameworkUrl: buildUrl + "/Web.framework.js.br",
+        codeUrl: buildUrl + "/Web.wasm.br",
+        streamingAssetsUrl: "StreamingAssets",
+        companyName: "DefaultCompany",
+        productName: "2D Character Sampler",
+        productVersion: "1.0",
+      };
 
-        //Helper variable for Synchronization
-        var helper;
-        
-        //Mesh Data Variables
-        var stageMesh,
-            umiMesh,
-            honokaMesh, 
-            nozoMesh,
-            makiMesh,
-            hanayoMesh,
-            rinMesh,
-            eliMesh,
-            nicoMesh,
-            kotoriMesh;
+      var container = document.querySelector("#unity-container");
+      var canvas = document.querySelector("#unity-canvas");
+      var loadingBar = document.querySelector("#unity-loading-bar");
+      var progressBarFull = document.querySelector("#unity-progress-bar-full");
+      var fullscreenButton = document.querySelector("#unity-fullscreen-button");
+      var mobileWarning = document.querySelector("#unity-mobile-warning");
 
-        //Boolean Flags for Model Loading
-        var stageReady = false,
-            musicReady = false,
-            umiReady = false,
-            eliReady = false, 
-            makiReady = false,
-            kotoriReady = false,
-            hanayoReady = false,
-            nicoReady = false,
-            honokaReady = false,
-            nozoReady = false,
-            rinReady = false;
-        
-        var windowHalfX = window.innerWidth / 2;
-        var windowHalfY = window.innerHeight / 2;
-        var clock = new THREE.Clock();
-        
-        //Snow Particle Effect
-        var particleCount = 2000;
-        var pMaterial = new THREE.PointCloudMaterial({
-            color: 0xFFFFFF,
-            size: 4,
-            map: THREE.ImageUtils.loadTexture("img/ParticleSmoke.png"),
-            blending: THREE.AdditiveBlending,
-            depthTest: false,
-            transparent: true
+      // By default Unity keeps WebGL canvas render target size matched with
+      // the DOM size of the canvas element (scaled by window.devicePixelRatio)
+      // Set this to false if you want to decouple this synchronization from
+      // happening inside the engine, and you would instead like to size up
+      // the canvas DOM size and WebGL render target sizes yourself.
+      // config.matchWebGLToCanvasSize = false;
+
+      if (/iPhone|iPad|iPod|Android/i.test(navigator.userAgent)) {
+        container.className = "unity-mobile";
+        // Avoid draining fillrate performance on mobile devices,
+        // and default/override low DPI mode on mobile browsers.
+        config.devicePixelRatio = 1;
+        mobileWarning.style.display = "block";
+        setTimeout(() => {
+          mobileWarning.style.display = "none";
+        }, 5000);
+      } else {
+        canvas.style.width = "960px";
+        canvas.style.height = "600px";
+      }
+      loadingBar.style.display = "block";
+
+      var script = document.createElement("script");
+      script.src = loaderUrl;
+      script.onload = () => {
+        createUnityInstance(canvas, config, (progress) => {
+          progressBarFull.style.width = 100 * progress + "%";
+        }).then((unityInstance) => {
+          loadingBar.style.display = "none";
+          fullscreenButton.onclick = () => {
+            unityInstance.SetFullscreen(1);
+          };
+        }).catch((message) => {
+          alert(message);
         });
-        
-        var particles = new THREE.Geometry;
-        for (var i = 0; i < particleCount; i++) {
-            var pX = Math.random()*1000 - 500,
-            pY = Math.random()*500 - 250,
-            pZ = Math.random()*1000 - 500,
-            particle = new THREE.Vector3(pX, pY, pZ);
-            particle.velocity = {};
-            particle.velocity.y = -1;
-            particles.vertices.push(particle);
-        }
-        
-        var simulateRain = function(){
-          var pCount = particleCount;
-          while (pCount--) {
-            var particle = particles.vertices[pCount];
-            if (particle.y < -200) {
-              particle.y = 200;
-              particle.velocity.y = -1.2;
-            }
-            particle.velocity.y -= Math.random() * .02;
-            particle.y += particle.velocity.y;
-          }
-          particles.verticesNeedUpdate = true;
-        };
-        
-        //init();
-
-        function init() {
-
-            container = document.createElement('div');
-            document.body.appendChild(container);
-            
-            //Stats
-            stats = new Stats();
-            container.appendChild( stats.dom );
-            
-            //Renderer Set Up
-            renderer = new THREE.WebGLRenderer({
-                antialias: true
-            });
-            renderer.setPixelRatio(window.devicePixelRatio);
-            renderer.setSize(window.innerWidth, window.innerHeight);
-            renderer.setClearColor(new THREE.Color(0x000000));
-            container.appendChild(renderer.domElement);
-
-            effect = new THREE.OutlineEffect(renderer);
-
-            //Camera Setup
-            camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 1, 4000);
-            camera.position.z = 50;
-            camera.position.y = 10;
-
-            //Scene
-            scene = new THREE.Scene();
-            var particleSystem = new THREE.PointCloud(particles, pMaterial);
-            particleSystem.position.y = 200;
-            scene.add(particleSystem);
-            
-            
-            //Lighting
-            var ambient = new THREE.AmbientLight(0xeeeeee);
-            scene.add(ambient);
-            var light1 = new THREE.DirectionalLight(0x888888, 0.3);
-            light1.position.set(-15, 15, 20);
-            scene.add(light1);
-            var light2 = new THREE.DirectionalLight(0x888888, 0.3);
-            light2.position.set(15, 15, 20);
-            scene.add(light2);
-            // Shadow parameters
-            renderer.shadowMap.enabled = true;
-            light1.castShadow = true;
-            light1.shadow.mapSize.x = 2048;
-            light1.shadow.mapSize.y = 2048;
-            light1.shadow.camera.right = 20;
-            light1.shadow.camera.top = 20;
-            light1.shadow.camera.left = -20;
-            light1.shadow.camera.bottom = -20;
-            // Model specific Shadow parameters
-            renderer.shadowMap.renderSingleSided = false;
-            renderer.shadowMap.renderReverseSided = false;
-            light1.shadow.bias = -0.001;
-            
-            //Post processing effects
-            /*
-            composer = new THREE.EffectComposer(renderer);
-            var renderPass = new THREE.RenderPass(scene, camera);
-            var copyShader = new THREE.ShaderPass(THREE.CopyShader);
-            copyShader.renderToScreen = true;
-            bloomPass = new THREE.UnrealBloomPass(new THREE.Vector2(window.innerWidth, window.innerHeight), 0.05, 0.05, 0.05);
-            composer = new THREE.EffectComposer(renderer);
-		    composer.setSize(window.innerWidth, window.innerHeight);
-		    composer.addPass(renderPass);
-		    composer.addPass(bloomPass);
-            composer.addPass(copyShader);
-            */
-            
-            var manager = new THREE.LoadingManager();
-            manager.onStart = function ( url, itemsLoaded, itemsTotal ) {
-                console.log( 'Started loading file: ' + url + '.\nLoaded ' + itemsLoaded + ' of ' + itemsTotal + ' files.' );
-                document.getElementById("loading").innerHTML = 'Started loading file: ' + url + '.\nLoaded ' + itemsLoaded + ' of ' + itemsTotal + ' files.';
-            };
-
-            manager.onLoad = function ( ) {
-                console.log( 'Loading complete!');
-                document.getElementById("loading").innerHTML = 'Loading complete!';
-            };
-
-
-            manager.onProgress = function ( url, itemsLoaded, itemsTotal ) {
-                console.log( 'Loading file: ' + url + '.\nLoaded ' + itemsLoaded + ' of ' + itemsTotal + ' files.' );
-                document.getElementById("loading").innerHTML = 'Loading file: ' + url + '.\nLoaded ' + itemsLoaded + ' of ' + itemsTotal + ' files.';
-
-            };
-
-            manager.onError = function ( url ) {
-                console.log( 'There was an error loading ' + url );
-                document.getElementById("loading").innerHTML = 'There was an error loading ' + url
-            };
-            
-            //Loader callbacks
-            var onProgress = function(xhr) {
-                if (xhr.lengthComputable) {
-                    var percentComplete = xhr.loaded / xhr.total * 100;
-                    //console.log(Math.round(percentComplete, 2) + '% downloaded');
-                    //document.getElementById("loading").innerHTML = 'Loading ' + xhr + ': ' + Math.round(percentComplete, 2) + '% downloaded';
-                }
-            };
-
-            var onError = function(xhr) {};
-
-            helper = new THREE.MMDHelper();
-            
-            var xModelPos = 0;
-            var yModelPos = -2;
-            var zModelPos = 0;
-
-            //Load all models - Please Refactor
-            var umiLoader = new THREE.MMDLoader(manager);
-            var umiModel = 'SnowHalation/Model/umi_sbk_test.pmx';
-            var umiVmd = ['SnowHalation/Motion/Umi.vmd'];
-            umiLoader.load(umiModel, umiVmd, function(object) {
-                umiMesh = object;
-                umiMesh.castShadow = true;
-                umiMesh.receiveShadow = false;
-                umiMesh.position.set(xModelPos, yModelPos, zModelPos);
-                helper.add(umiMesh);
-                helper.setAnimation(umiMesh);
-                //helper.setPhysics(umiMesh);
-                scene.add(umiMesh);
-                umiReady = true;
-
-                var rinLoader = new THREE.MMDLoader(manager);
-                var rinModel = 'SnowHalation/Model/rin_sbk_test.pmx';
-                var rinVmd = ['SnowHalation/Motion/Rin.vmd'];
-                rinLoader.load(rinModel, rinVmd, function(object) {
-                    rinMesh = object;
-                    rinMesh.castShadow = true;
-                    rinMesh.receiveShadow = false;
-                    rinMesh.position.set(xModelPos, yModelPos, zModelPos);
-                    helper.add(rinMesh);
-                    helper.setAnimation(rinMesh);
-                    //helper.setPhysics(rinMesh);
-                    scene.add(rinMesh);
-                    rinReady = true;
-                    
-                    var kotoriLoader = new THREE.MMDLoader(manager);
-                    var kotoriModel = 'SnowHalation/Model/kotori_sbk_test.pmx';
-                    var kotoriVmd = ['SnowHalation/Motion/Kotori.vmd'];
-                    kotoriLoader.load(kotoriModel, kotoriVmd, function(object) {
-                        kotoriMesh = object;
-                        kotoriMesh.castShadow = true;
-                        kotoriMesh.receiveShadow = false;
-                        kotoriMesh.position.set(xModelPos, yModelPos, zModelPos);
-                        helper.add(kotoriMesh);
-                        helper.setAnimation(kotoriMesh);
-                        //helper.setPhysics(kotoriMesh);
-                        scene.add(kotoriMesh);
-                        kotoriReady = true;
-                        
-                        var honokaLoader = new THREE.MMDLoader(manager);
-                        var honokaModel = 'SnowHalation/Model/honoka_skb_test.pmx';
-                        var honokaVmd = ['SnowHalation/Motion/Honoka.vmd'];
-                        honokaLoader.load(honokaModel, honokaVmd, function(object) {
-                            honokaMesh = object;
-                            honokaMesh.castShadow = true;
-                            honokaMesh.receiveShadow = false;
-                            honokaMesh.position.set(xModelPos, yModelPos, zModelPos);
-                            helper.add(honokaMesh);
-                            helper.setAnimation(honokaMesh);
-                            //helper.setPhysics(honokaMesh);
-                            scene.add(honokaMesh);
-                            honokaReady = true;     
-
-                            var makiLoader = new THREE.MMDLoader(manager);
-                            var makiModel = 'SnowHalation/Model/maki_sbk_test.pmx';
-                            var makiVmd = ['SnowHalation/Motion/Maki.vmd'];
-                            makiLoader.load(makiModel, makiVmd, function(object) {
-                                makiMesh = object;
-                                makiMesh.castShadow = true;
-                                makiMesh.receiveShadow = false;
-                                makiMesh.position.set(xModelPos, yModelPos, zModelPos);
-                                helper.add(makiMesh);
-                                helper.setAnimation(makiMesh);
-                                //helper.setPhysics(makiMesh);
-                                scene.add(makiMesh);
-                                makiReady = true;
-
-                                var hanayoLoader = new THREE.MMDLoader(manager);
-                                var hanayoModel = 'SnowHalation/Model/hanayo_sbk_test.pmx';
-                                var hanayoVmd = ['SnowHalation/Motion/Hanayo.vmd'];
-                                hanayoLoader.load(hanayoModel, hanayoVmd, function(object) {
-                                    hanayoMesh = object;
-                                    hanayoMesh.castShadow = true;
-                                    hanayoMesh.receiveShadow = false;
-                                    hanayoMesh.position.set(xModelPos, yModelPos, zModelPos);
-                                    helper.add(hanayoMesh);
-                                    helper.setAnimation(hanayoMesh);
-                                    //helper.setPhysics(hanayoMesh);
-                                    scene.add(hanayoMesh);
-                                    hanayoReady = true;
-
-                                    var eliLoader = new THREE.MMDLoader(manager);
-                                    var eliModel = 'SnowHalation/Model/eri_sbk_test.pmx';
-                                    var eliVmd = ['SnowHalation/Motion/Eri.vmd'];
-                                    eliLoader.load(eliModel, eliVmd, function(object) {
-                                        eliMesh = object;
-                                        eliMesh.castShadow = true;
-                                        eliMesh.receiveShadow = false;
-                                        eliMesh.position.set(xModelPos, yModelPos, zModelPos);
-                                        helper.add(eliMesh);
-                                        helper.setAnimation(eliMesh);
-                                        //helper.setPhysics(eliMesh);
-                                        scene.add(eliMesh);
-                                        eliReady = true;
-
-                                        var nicoLoader = new THREE.MMDLoader(manager);
-                                        var nicoModel = 'SnowHalation/Model/nico_sbk_test.pmx';
-                                        var nicoVmd = ['SnowHalation/Motion/Nico.vmd'];
-                                        nicoLoader.load(nicoModel, nicoVmd, function(object) {
-                                            nicoMesh = object;
-                                            nicoMesh.castShadow = true;
-                                            nicoMesh.receiveShadow = false;
-                                            nicoMesh.position.set(xModelPos, yModelPos, zModelPos);
-                                            helper.add(nicoMesh);
-                                            helper.setAnimation(nicoMesh);
-                                            //helper.setPhysics(nicoMesh);
-                                            scene.add(nicoMesh);
-                                            nicoReady = true;
-
-                                            var nozoLoader = new THREE.MMDLoader(manager);
-                                            var nozoModel = 'SnowHalation/Model/nozomi_sbk_test.pmx';
-                                            var nozoVmd = ['SnowHalation/Motion/Nozomi.vmd'];
-                                            nozoLoader.load(nozoModel, nozoVmd, function(object) {
-                                                nozoMesh = object;
-                                                nozoMesh.castShadow = true;
-                                                nozoMesh.receiveShadow = false;
-                                                nozoMesh.position.set(xModelPos, yModelPos, zModelPos);
-                                                helper.add(nozoMesh);
-                                                helper.setAnimation(nozoMesh);
-                                                //helper.setPhysics(nozoMesh);
-                                                scene.add(nozoMesh);
-                                                nozomiReady = true;
-
-                                                var stageLoader = new THREE.MMDLoader(manager);
-                                                var stageModel = 'SnowHalation/Stage/Snow_halation_stage.pmx';
-                                                stageLoader.loadModel(stageModel, function(object) {
-                                                    stageMesh = object;
-                                                    stageMesh.position.y = -1;
-                                                    stageMesh.receiveShadow = true;
-                                                    scene.add(stageMesh);
-                                                    stageReady = true;
-                                                    
-                                                    //var cameraFile = 'Camera.vmd';
-                                                    //var cameraFile = 'SnowHalation/Motion/Camera.vmd';
-                                                    var cameraFile = 'SnowHalation/Camera/wavefile_camera.vmd';
-                                                    umiLoader.loadVmd(cameraFile, function(vmd) {
-                                                        helper.setCamera(camera);
-                                                        umiLoader.pourVmdIntoCamera(camera, vmd);
-                                                        helper.setCameraAnimation(camera);
-                                                        var audioFile = 'SnowHalation/Music/SnowHalation.mp3';
-                                                        var audioParams = {
-                                                            delayTime: 1
-                                                        };
-                                                        umiLoader.loadAudio(audioFile, function(audio, listener) {
-                                                            animate();
-                                                            listener.position.z = 1;
-                                                            helper.setAudio(audio, listener, audioParams);
-                                                            helper.unifyAnimationDuration();
-                                                            scene.add(audio);
-                                                            scene.add(listener);
-                                                            musicReady = true;
-                                                            document.getElementById("loading").innerHTML = 'Loading complete!';
-                                                        }, onProgress, onError);
-                                                    }, onProgress, onError);
-                                                }, onProgress, onError);
-                                            }, onProgress, onError);
-                                        }, onProgress, onError);
-                                    }, onProgress, onError);
-                                }, onProgress, onError);
-                            }, onProgress, onError);
-                        }, onProgress, onError);
-                    }, onProgress, onError);
-                }, onProgress, onError);
-            }, onProgress, onError);
-            window.addEventListener('resize', onWindowResize, false);
-        }
-
-        function onWindowResize() {
-            windowHalfX = window.innerWidth / 2;
-            windowHalfY = window.innerHeight / 2;
-            camera.aspect = window.innerWidth / window.innerHeight;
-            camera.updateProjectionMatrix();
-            effect.setSize(window.innerWidth, window.innerHeight);
-        }
-
-        function animate() {
-            requestAnimationFrame(animate);
-            stats.begin();
-            render();
-            stats.end();
-        }
-
-        function render() {
-            simulateRain();
-            if (musicReady) {
-                helper.animate(clock.getDelta());
-            }
-            effect.render(scene,camera);
-        }
+      };
+      document.body.appendChild(script);
     </script>
-</body>
-
+  </body>
 </html>
