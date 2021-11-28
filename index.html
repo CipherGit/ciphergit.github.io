@@ -3,22 +3,27 @@
   <head>
     <meta charset="utf-8">
     <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
-    <title>2D Animation Sampler for Untitled Pet Game</title>
+    <title>Unity WebGL Player | Laser Defender</title>
   </head>
   <body style="text-align: center">
-    <h1>2D Animation Sampler for Untitled Pet Game</h1>
-    <h3>Original Art by <a href="https://mimustudio.com/">MiMU Studio</a></h3>
-    <h3>Compiled by Justin P.</h3>
-    <canvas id="unity-canvas" width=960 height=600 style="width: 960px; height: 600px; background: #231F20"></canvas>
-    <script src="Build/Web.loader.js"></script>
+    <canvas id="unity-canvas" width=540 height=960 style="width: 540px; height: 960px; background: #231F20"></canvas>
+    <script src="Build/WebGL.loader.js"></script>
     <script>
+      if (/iPhone|iPad|iPod|Android/i.test(navigator.userAgent)) {
+        // Mobile device style: fill the whole browser client area with the game canvas:
+        var meta = document.createElement('meta');
+        meta.name = 'viewport';
+        meta.content = 'width=device-width, height=device-height, initial-scale=1.0, user-scalable=no, shrink-to-fit=yes';
+        document.getElementsByTagName('head')[0].appendChild(meta);
+      }
+
       createUnityInstance(document.querySelector("#unity-canvas"), {
-        dataUrl: "Build/Web.data",
-        frameworkUrl: "Build/Web.framework.js",
-        codeUrl: "Build/Web.wasm",
+        dataUrl: "Build/WebGL.data",
+        frameworkUrl: "Build/WebGL.framework.js",
+        codeUrl: "Build/WebGL.wasm",
         streamingAssetsUrl: "StreamingAssets",
-        companyName: "Nameless Game Studio",
-        productName: "2D Character Sampler For Charmaine",
+        companyName: "BRBStudios",
+        productName: "Laser Defender",
         productVersion: "1.0",
         // matchWebGLToCanvasSize: false, // Uncomment this to separately control WebGL canvas render size and DOM element size.
         // devicePixelRatio: 1, // Uncomment this to override low DPI rendering on high DPI displays.
